@@ -975,6 +975,10 @@ Default Value: leave empty or set main.
 
 Use Groovy Sandbox: Checked.
 
+Branches to build:
+
+*/${BRANCH_NAME}
+
 ------------------------------------------------------------------------------------------
 
 Optional: Git Credentials
