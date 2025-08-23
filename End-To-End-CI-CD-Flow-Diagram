@@ -1,0 +1,63 @@
+           ┌───────────────────────────┐
+           │        Developer          │
+           │   Pushes code to Git      │
+           └─────────────┬────────────┘
+                         │
+                         ▼
+           ┌───────────────────────────┐
+           │         Jenkins           │
+           │  Pipeline Job (SCM)       │
+           │  Pulls Jenkinsfile from   │
+           │  Git repository           │
+           └─────────────┬────────────┘
+                         │
+                         ▼
+           ┌───────────────────────────┐
+           │ Load Maven Managed File    │
+           │ (settings.xml template)   │
+           │ Placeholders:             │
+           │  ${username}, ${password},│
+           │  ${nexus_private_ip}      │
+           └─────────────┬────────────┘
+                         │
+                         ▼
+           ┌───────────────────────────┐
+           │ Inject Secrets & IP       │
+           │ (runMaven function)       │
+           │   - NEXUS_USER            │
+           │   - NEXUS_PASS            │
+           │   - NEXUS_PRIVATE_IP      │
+           └─────────────┬────────────┘
+                         │
+                         ▼
+           ┌───────────────────────────┐
+           │ Maven Build / Test        │
+           │ - Build WAR/JAR           │
+           │ - Unit & Integration Test │
+           │ - Checkstyle Analysis     │
+           │ - SonarQube Inspection    │
+           │ Logs safe; no secrets     │
+           └─────────────┬────────────┘
+                         │
+                         ▼
+           ┌───────────────────────────┐
+           │ Nexus Artifact Upload      │
+           │ - Uses injected creds      │
+           │ - Dynamic private IP       │
+           │ - Temporary settings.xml   │
+           └─────────────┬────────────┘
+                         │
+                         ▼
+           ┌───────────────────────────┐
+           │ Ansible Deployment         │
+           │ - Hosts: Dev → Stage → Prod│
+           │ - Credentials injected     │
+           │ - Workspace path provided  │
+           └─────────────┬────────────┘
+                         │
+                         ▼
+           ┌───────────────────────────┐
+           │ Slack Notifications        │
+           │ - Success / Failure / Unstable │
+           │ - No secrets exposed      │
+           └───────────────────────────┘
