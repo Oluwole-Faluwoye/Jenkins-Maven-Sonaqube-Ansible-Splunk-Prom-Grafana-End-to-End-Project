@@ -975,11 +975,12 @@ Default Value: leave empty or set main.
 
 Use Groovy Sandbox: Checked.
 
-Branches to build:
+Branches to build:    */main                  
 
-*/${BRANCH_NAME}
 
-------------------------------------------------------------------------------------------
+ ( */main → This tells Jenkins where to get the Jenkinsfile.   The ${params.BRANCH_NAME} → You decide dynamically inside the pipeline which branch to actually build.)
+
+----------------------------------------------------------------------------------------------------------------------------
 
 Optional: Git Credentials
 
