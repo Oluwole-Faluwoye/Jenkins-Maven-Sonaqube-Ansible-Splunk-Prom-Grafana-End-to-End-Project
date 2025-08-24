@@ -1009,3 +1009,28 @@ Make sure Git is installed on the Jenkins master
 
 
 
+-----------------------------------------------------------------------------------------------------------------------------
+
+Summary: Minimum required for your pipeline to work automatically on GitHub pushes:
+
+Pipeline: Multibranch
+
+Pipeline
+
+Git Plugin
+
+GitHub Branch Source
+
+Credentials Plugin
+
+Config File Provider
+
+Nexus Artifact Uploader
+
+SonarQube Scanner for Jenkins
+
+Slack Notification Plugin
+
+Pipeline Maven Integration
+
+------------------------------------------------------------------------------------------------------------------------
