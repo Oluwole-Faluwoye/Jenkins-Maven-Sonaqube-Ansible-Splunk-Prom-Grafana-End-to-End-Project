@@ -1,0 +1,143 @@
+Step 1: Jenkins Credential Setup
+
+Generate or reuse a private SSH key:
+
+ssh-keygen -t rsa -b 4096 -C "jenkins_deploy" -f jenkins_deploy_key
+
+
+Store private key in Jenkins as:
+
+Kind: SSH Username with private key
+
+ID: Jenkins-Deploy-Key
+
+Username: ec2-user
+
+No need to store public key in Jenkins; Ansible will push it dynamically.
+
+Step 2: Ansible Inventory (aws_ec2.yaml)
+plugin: aws_ec2
+regions:
+  - us-east-2  # Replace with your region
+filters:
+  "tag:Environment": ["dev", "stage", "prod"]
+  instance-state-name: running
+keyed_groups:
+  - key: tags.Environment
+    prefix: tag_Environment_
+
+Step 3: Ansible Bootstrap Playbook (bootstrap_key.yaml)
+---
+- name: Bootstrap Jenkins SSH Key
+  hosts: "{{ hosts }}"
+  become: false
+  vars:
+    jenkins_pub_key: "{{ lookup('file', 'jenkins_deploy_key.pub') }}"
+    ansible_user: ec2-user  # Or another user that has sudo
+  tasks:
+    - name: Ensure .ssh directory exists
+      file:
+        path: /home/{{ ansible_user }}/.ssh
+        state: directory
+        mode: '0700'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+
+    - name: Add Jenkins public key to authorized_keys
+      authorized_key:
+        user: "{{ ansible_user }}"
+        key: "{{ jenkins_pub_key }}"
+        state: present
+
+
+This automatically copies the Jenkins public key to all EC2 instances for passwordless SSH.
+
+Step 4: Ansible Deployment Playbook (deploy.yaml)
+---
+- name: Deploy webapp to EC2 instances
+  hosts: "{{ hosts }}"
+  become: false
+  vars:
+    src_path: "{{ workspace_path }}/webapp/target/webapp.war"
+    dest_path: "/opt/tomcat9/webapps/webapp.war"
+    ansible_user: ec2-user  # Should match bootstrap user
+
+  tasks:
+    - name: Ensure Tomcat webapps directory exists
+      file:
+        path: "/opt/tomcat9/webapps"
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        mode: '0775'
+
+    - name: Copy WAR file to Tomcat
+      copy:
+        src: "{{ src_path }}"
+        dest: "{{ dest_path }}"
+        owner: ec2-user
+        group: ec2-user
+        mode: '0664'
+
+    - name: Restart Tomcat to deploy new WAR
+      systemd:
+        name: tomcat
+        state: restarted
+        enabled: true
+
+    - name: Wait for Tomcat to start
+      wait_for:
+        host: "{{ inventory_hostname }}"
+        port: 8080
+        delay: 10
+        timeout: 60
+
+    - name: Verify deployment
+      uri:
+        url: "http://{{ inventory_hostname }}:8080/webapp/"
+        status_code: 200
+      register: result
+      retries: 5
+      delay: 5
+      until: result.status == 200
+
+Step 5: Updated Jenkinsfile Deployment Stage
+stage('Deploy to Environment') {
+    matrix {
+        axes {
+            axis {
+                name 'HOSTS'
+                values 'dev', 'stage', 'prod'
+            }
+        }
+        stages {
+            stage('Bootstrap and Deploy') {
+                steps {
+                    sshagent(['Jenkins-Deploy-Key']) {
+                        sh """
+                        # Bootstrap the Jenkins public key to instances
+                        ansible-playbook -i ${WORKSPACE}/ansible-config/aws_ec2.yaml ${WORKSPACE}/ansible-config/bootstrap_key.yaml \
+                        --extra-vars "hosts=tag_Environment_${HOSTS} workspace_path=${WORKSPACE}"
+
+                        # Deploy the WAR file
+                        ansible-playbook -i ${WORKSPACE}/ansible-config/aws_ec2.yaml ${WORKSPACE}/ansible-config/deploy.yaml \
+                        --extra-vars "hosts=tag_Environment_${HOSTS} workspace_path=${WORKSPACE}"
+                        """
+                    }
+                }
+            }
+        }
+    }
+}
+
+✅ Benefits of This Flow
+
+No manual SSH key copying.
+
+Works even if EC2 instances have different initial key pairs or regions.
+
+Uses passwordless SSH via Jenkins credentials.
+
+Deployment is fully automated — WAR is pushed and Tomcat restarted.
+
+Secure — private key stays in Jenkins credentials

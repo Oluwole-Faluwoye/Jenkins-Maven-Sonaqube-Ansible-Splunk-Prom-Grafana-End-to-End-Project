@@ -5,6 +5,8 @@ Prometheus Node exporter: 9100
 AMI : Amazon Linux 2023
 Instance type : T2.medium
 Pass the Jenkins-Maven-Ansible userdata
+
+Attach ECe Full Access role or give Fine grain permissions vis IAM   ( check bottom of this page for steps)
 ---------------------------------------------------------------
 create your sonarqube instance 
 ports :
@@ -323,11 +325,11 @@ youll be prompted to gve your Spunk username and passoword
 Ensure to run all the following above commands on all  dev, stage and prod instances
 ------------------------------------------------------------------------------------
 
-/opt/splunkforwarder/bin/splunk add monitor /opt/tomcat9/logs/    (All system and app logs are stored in this log lcation)
+./splunk add monitor /var/log/tomcat/    (All system and app logs are stored in this log lcation)
 
 
 
-you shuld have an output " Added monitor of '/opt/tomcat9/logs'. "
+you shuld have an output " Added monitor of '/var/log/tomcat/'. "
 
 ---------------------------------------------------------
 Now go to your Splunk Indexer Terminal 
@@ -408,7 +410,8 @@ Nexus Artifact Uploader
 Pipeline: Stage View
 Blue Ocean
 Build Timestamp
-Active Choices Plugin
+Active Choices
+Ansicolor
 
 click install 
 
@@ -451,26 +454,8 @@ readlink -f $(which java)
 You will see the output  ( /usr/lib/jvm/java-17-amazon-corretto.x86_64/bin/java )  Remove the " /bin/java " athe end and paste the rest  in your JAVA_HOME 
 
 Paste this in the JAVA_HOME section    :     /usr/lib/jvm/java-17-amazon-corretto.x86_64
-------------------------------------------------------------------------------------------------
 
 
-----------------------------------------------------------------------------------------------
-To use java 11 use these following steps 
------------------------------------------------------------------------------------
-
-select install automatically
-
-under " Download URL for binary archive"
-
-paste this there :
-
-
-https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz
-
-
-under  " Subdirectory of extracted archive"  Paste the next command there :
-
-jdk-11.0.1
 ------------------------------------------------------------------------------
 
 under SonarQube Scanner installations
@@ -489,6 +474,9 @@ install automatically
 Name : localMaven
 
 Click Save
+
+--------------------------------------------------------------------------
+
 
 -------------------------------------------------------------------------------------------
 
@@ -610,7 +598,7 @@ Create credential
 
 ----------------------------------------------------------------------------------
 
-Now we need to Ansible credential  
+Now we need to create  Ansible credential  
 
 click Add credentials
 
@@ -622,15 +610,17 @@ username : ansibleadmin
 
 password : ansibleadmin
 
-Paste the token you copied earlier during your slack integration under the "secret"
-
 Under ID paste "Ansible-Credential"
 
 Under description paste "Ansible-Credential"
 
 Create credential
 
---------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------------
+Go to Manage Jenkins
+
+Select system 
 
 Scroll down to the Slack Section 
 
@@ -645,10 +635,7 @@ mine : #af-cicd-pipeline-2
 Test connection 
 
 and save
-
------------------------------------------------------------------------------
- (Do This is if you're using  the generic Jenkinsfile)
--------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------
 
 Go to Manage Jenkins 
 
@@ -664,7 +651,8 @@ Name : SonarQube
 
 Server URL : http://YOUR_SONARQUBE_PRIVATE_IP:9000       (update the link with your sonarqube private IP)
 
-Under "Server authentication token"  select the " SonarQube-Token"
+Under "Server authentication token"  select the " Sonarqube-Token"
+
 
 ----------------------------------------------------------------------------------------------------------------
 (Do This is if you're using  the generic Jenkinsfile)
@@ -682,7 +670,7 @@ update the Host url section with your "Sonarqube_Private_IP"
     stage('SonarQube Inspection') {
         steps {
             withSonarQubeEnv('SonarQube') { 
-                withCredentials([string(credentialsId: 'SonarQube-Token', variable: 'SONAR_TOKEN')]) {
+                withCredentials([string(credentialsId: 'Sonarqube-Token', variable: 'SONAR_TOKEN')]) {
                 sh """
                 mvn sonar:sonar \
                 -Dsonar.projectKey=Java-WebApp-Project \
@@ -695,7 +683,7 @@ update the Host url section with your "Sonarqube_Private_IP"
 
 --------------------------------------------------------------------------------------
 
-Now we need to create a quality gate 
+Now we need to create a quality gate for Sonarqube on sonarQube UI
 
 On the Sonarqube web UI, click on "Quality gates" 
 
@@ -821,9 +809,12 @@ Payload URL:
 
 http://<your-jenkins-server>:8080/github-webhook/
 
+Jenkins Public IP since they are not in the same network
+
 
 Content type: application/json
 
+---------------------------------------------------------------------------------------------
 Secret: Optional, but recommended for security.
 
 Generate a secret string and configure the GitHub Plugin in Jenkins to match it.
@@ -833,7 +824,7 @@ Which events would you like to trigger this webhook?
 Choose Just the push event (or push + pull request if needed).
 
 Click Add webhook.
-
+-------------------------------------------------------------------------------------------
 3️⃣ Pipeline Definition in Jenkins Job
 
 In your Jenkins job:
@@ -916,41 +907,7 @@ You do not need to set BRANCH_NAME.
 The pipeline automatically runs for the branch that was pushed.
 
 You can then use conditional stages to deploy only on dev, stage, or main branches.
--------------------------------------------------------------------------------------------
 
-Navigate to Managed Files
-
-Go to Jenkins Dashboard → Manage Jenkins → Managed files.
-
-Click “Add a new Config” → Maven Settings Config.
-
-2️⃣ Create the Maven settings.xml Managed File
-
-Name / ID:
-
-Set the File ID to exactly match what your Jenkinsfile expects:
-
-maven-settings-template
-
-
-This is referenced in your Jenkinsfile:
-
-configFileProvider([configFile(fileId: 'maven-settings-template', variable: 'MAVEN_SETTINGS')])
-
-
-Name:
-
-Example: Maven Settings Template (just a human-readable name).
-
-Comment: Optional — e.g., Template settings.xml for Nexus authentication
-
-We are not Building yet, we need to push the changes we made in our Jenkinsfile and push
-
-git add .
-
-git commit -m 'updated Jenkinsfile"
-
-git push 
 -----------------------------------------------------------------------------------
 
 Configure Your Pipeline Job
@@ -969,7 +926,7 @@ Description: Select branch to build (manual build only)
 
 Choice Type: Single Select
 
-Groovy Script: Paste the script above.
+Groovy Script: Paste the script (Active-Choice-Parameter).
 
 Default Value: leave empty or set main.
 
@@ -978,8 +935,7 @@ Use Groovy Sandbox: Checked.
 Branches to build:    */main                  
 
 
- ( */main → This tells Jenkins where to get the Jenkinsfile.   The ${params.BRANCH_NAME} → You decide dynamically inside the pipeline which branch to actually build.)
-
+ ( */main → This tells Jenkins where to get the Jenkinsfile.   
 ----------------------------------------------------------------------------------------------------------------------------
 
 Optional: Git Credentials
@@ -998,6 +954,8 @@ Save Job Configuration
 
 Click Save at the bottom.
 
+
+
 ------------------------------------------------------------------------------------------------------------------------
 
 Now build your Job 
@@ -1007,30 +965,246 @@ It would fail at Nexus Artifact uplod because we havent created our repositories
 Make sure Git is installed on the Jenkins master
 ---------------------------------------------------
 
+Now we need to configure the our repository the artifact will be deployed in
+
+Go your Nexus UI
+
+Click on repositories
+
+click on create repositories 
+
+select ' Maven 2 Hosted '
+
+Name : maven-project-releases
+
+version policy : release 
+
+create repository 
+
+---------------------------------------------------------
+
+click on create repositories again
+
+select ' Maven 2 Hosted '
+
+Name : maven-project-snapshots
+
+version policy : snapshot 
+
+create repository 
+
+-----------------------------------------------------------------------------------------------------------------------
+
+if you want all the dependencies that your build needs to be stored inside your Nexus repo, you'll need to create a proxy repository.
+
+--------------------------------------------------------------------------------------------------------------
+
+Go your pom.xml file and update it with your Nexus_Private_IP and the names of the repositories you just created appropriately
+
+ ( i.e the release and the snap shot repositories)
+
+ Also ensure to update the Jenkinsfile with your Nexus_private_IP and the  names of the rpositories you just created.
+
+------------------------------------------------------------------------------------------------------------------------------------
+
+Now push your changes to github, your webhook should call your jenkins and start the build.
 
 
------------------------------------------------------------------------------------------------------------------------------
+check Nexus, the artifact would have been deployed in your Nexus
 
-Summary: Minimum required for your pipeline to work automatically on GitHub pushes:
+check the right repo either Snapshot or Release repo
 
-Pipeline: Multibranch
+--------------------------------------------------------------------------------------------------------------------
 
-Pipeline
+update your aws_ec2.yaml file with the regions youre deploying to, and it would be deployed to your instances in that region using the tags you provided.
 
-Git Plugin
+---------------------------------------------------------------------------------------------------------------------
 
-GitHub Branch Source
+For Jenkins to Deply into your instances, There are two approaches. 
 
-Credentials Plugin
+USE IAM ROLE IF JENKINS INSTANCE AND ENVIRONRMNT INSTANCES ARE ON AWS 
+----------------------------------------------------------------------------------------------------------------------
 
-Config File Provider
+The IAM role for Jenkins must allow EC2 discovery and tagging (not S3, not EKS, etc. unless you need them).
 
-Nexus Artifact Uploader
+✅ Minimum IAM Policy for Jenkins Instance Role  or EC2 full access role for a faster approach but better to give fine grain access for better security
 
-SonarQube Scanner for Jenkins
+Attach an IAM role with the following managed policies or custom inline policy:
 
-Slack Notification Plugin
+Option 1: AWS Managed Policies
 
-Pipeline Maven Integration
+AmazonEC2ReadOnlyAccess → to allow Jenkins/Ansible dynamic inventory to list EC2 instances across regions.
 
-------------------------------------------------------------------------------------------------------------------------
+AmazonSSMManagedInstanceCore (optional) if you ever want Jenkins/Ansible to connect using SSM Session Manager instead of SSH.
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------
+Option 2: Custom Inline Policy (preferred & tighter security)
+
+If you want least privilege, attach a role with this custom inline policy:
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeTags",
+        "ec2:DescribeRegions"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+
+
+This is enough for the Ansible AWS dynamic inventory plugin (aws_ec2.yaml) to work across multiple regions.
+1️⃣ Create the IAM Policy (without S3)
+
+Go to AWS Console → IAM → Policies → Create Policy → JSON tab, then paste:
+
+
+--------------------------------------------------------------------------
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeTags"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+
+----------------------------------------------------------------------------
+
+(You can expand this if Ansible needs more EC2 actions.)
+
+
+B)
+
+Create an IAM Role:
+
+Go to AWS Console → IAM → Roles → Create role.
+
+Select AWS Service → EC2.
+
+Attach the policy:
+
+
+Attach Role to Jenkins EC2 Instance:
+
+Go to EC2 → Select your Jenkins instance → Security → Modify IAM Role.
+
+Attach the role you just created.
+
+Use dynamic inventory without credentials:
+-------------------------------------------------------------------------
+Your aws_ec2.yaml already works:
+------------------------------------------------------------------------------------
+
+
+plugin: aws_ec2
+regions:
+  - us-east-1
+filters:
+  "tag:Environment": ["dev", "stage", "prod"]
+  instance-state-name: running
+keyed_groups:
+  - key: tags.Environment
+    prefix: tag_Environment_
+
+-------------------------------------------------------------------------
+
+
+No aws_access_key or aws_secret_key is needed.
+
+✅ Result: Ansible automatically uses the IAM role and populates your inventory.
+
+-----------------------------------------------------------------------------------------
+
+You will need to manually approve to deploy to prod to ensure no bug or vulnerability is being pushed automatically to your prod. 
+
+you would check the your dev and stage which would have been deployed to automatically to ensure the app is working perfectly
+
+Then you can now approve to deploy to prod.
+
+----------------------------------------------------------------------------------------------------------
+PROBLEM
+
+Our boto3 (1.40.22) and botocore (1.40.22) are too oldfrom our Jenkins-Maven-Ansible Installation script which is cusing Ansible not to see our credentials
+
+Support for IMDSv2 (the token-based metadata service) only landed in botocore 1.13.0+ (2019) but many improvements/fixes were added in later releases.
+
+You’re running 1.40.22, which is way behind (the latest is around boto3 1.35.x and botocore 1.35.x as of mid-2025).
+
+That’s why boto3 can’t fetch temporary credentials from your IAM role → Ansible fails with “Unable to locate credentials”.
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+SOLUTION
+-------------------------------------------------------------------
+Open your Jenkins instance in terminal (i.e SSH into it)
+
+Then
+
+Install boto3/botocore system-wide :
+
+run command   :  sudo pip3 install --upgrade boto3 botocore
+
+
+This ensures /usr/bin/python3 (system Python) uses the upgraded boto3/botocore.
+
+After this, test:
+
+python3 -c "import boto3; sts=boto3.client('sts'); print(sts.get_caller_identity())"
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------
+we were facing SSH  issues. Host checking problems
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+How to solve 
+----------------------------------------------------------------------------------------------------
+
+Option 1 — Use SSH keys (recommended)
+
+Generate a keypair (if you don’t have one):
+
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/ansibleadmin_key
+
+
+Copy the public key to all EC2 hosts:
+
+ssh-copy-id -i ~/.ssh/ansibleadmin_key.pub ansibleadmin@<ec2-ip>
+
+
+Update your playbook or inventory to use the key instead of a password:
+
+ansible_user: ansibleadmin
+ansible_ssh_private_key_file: /home/jenkins/.ssh/ansibleadmin_key
+
+
+Remove ansible_password from extra-vars.
+
+✅ This is secure and avoids host key checking problems.
+
+-----------------------------------------------------------------------------------------------------
+
+Create a file ansible.cfg in your project root where you have deploy.yaml 
+----------------------------------------------------------------------------------------------------------
+
+Option 2 — Temporarily disable host key checking (less secure)
+
+Add this to your ansible.cfg :
+
+[defaults]
+host_key_checking = False
+
+
+
+
