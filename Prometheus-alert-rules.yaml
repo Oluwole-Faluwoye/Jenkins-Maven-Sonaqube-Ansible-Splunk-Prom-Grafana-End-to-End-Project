@@ -1,0 +1,141 @@
+groups:
+  - name: infrastructure-alerts
+    rules:
+      # Node / Host alerts
+      - alert: HighCPUUsageWarning
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage warning on {{ $labels.instance }}"
+          description: "CPU usage > 80% for 5m. Monitor and investigate if sustained."
+
+      - alert: HighCPUUsageCritical
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU usage CRITICAL on {{ $labels.instance }}"
+          description: "CPU usage > 95% for 5m. Immediate action required!"
+
+      - alert: HighMemoryUsageWarning
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage warning on {{ $labels.instance }}"
+          description: "Memory usage > 80% for 5m."
+
+      - alert: HighMemoryUsageCritical
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High memory usage CRITICAL on {{ $labels.instance }}"
+          description: "Memory usage > 95% for 5m. Immediate action required!"
+
+      - alert: DiskSpaceRunningLow
+        expr: (node_filesystem_size_bytes - node_filesystem_avail_bytes) / node_filesystem_size_bytes * 100 > 90
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk almost full on {{ $labels.instance }}"
+          description: "Disk usage > 90% for 10m. Immediate attention required!"
+
+      - alert: NodeDown
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node down: {{ $labels.instance }}"
+          description: "Prometheus has stopped receiving metrics from node {{ $labels.instance }}."
+
+  - name: kubernetes-alerts
+    rules:
+      - alert: PodCrashLooping
+        expr: increase(kube_pod_container_status_restarts_total[5m]) > 3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod crash looping: {{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} restarted > 3 times in 5m."
+
+      - alert: NodeNotReady
+        expr: kube_node_status_condition{condition="Ready", status="false"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node not ready: {{ $labels.node }}"
+          description: "Kubernetes node {{ $labels.node }} is not ready."
+
+      - alert: ContainerOOMKilled
+        expr: increase(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container OOMKilled"
+          description: "Container in pod {{ $labels.pod }} was OOMKilled."
+
+  - name: application-alerts
+    rules:
+      - alert: ApplicationDown
+        expr: up{job="myapp"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application down: {{ $labels.instance }}"
+          description: "Prometheus cannot scrape metrics from application {{ $labels.job }}."
+
+      - alert: HighErrorRateWarning
+        expr: (sum(rate(http_requests_total{status=~"5.."}[5m])) by (instance)) / (sum(rate(http_requests_total[5m])) by (instance)) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx error rate warning on {{ $labels.instance }}"
+          description: "5xx errors > 5% of total requests for 10m."
+
+      - alert: HighErrorRateCritical
+        expr: (sum(rate(http_requests_total{status=~"5.."}[5m])) by (instance)) / (sum(rate(http_requests_total[5m])) by (instance)) > 0.2
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High 5xx error rate CRITICAL on {{ $labels.instance }}"
+          description: "5xx errors > 20% of total requests for 10m. Immediate action required!"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, instance)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency on {{ $labels.instance }}"
+          description: "95th percentile request latency > 0.5s for 5m."
+
+      - alert: High4xxRate
+        expr: (sum(rate(http_requests_total{status=~"4.."}[5m])) by (instance)) / (sum(rate(http_requests_total[5m])) by (instance)) > 0.2
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "High 4xx rate on {{ $labels.instance }}"
+          description: "More than 20% of requests are returning 4xx errors for 10m."
+
+      - alert: QueueBacklog
+        expr: queue_jobs_pending > 100
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue backlog too high"
+          description: "Pending jobs in queue exceed 100 for 15m."

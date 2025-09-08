@@ -1,0 +1,26 @@
+global:
+  scrape_interval: 20s
+  evaluation_interval: 20s
+  external_labels:
+    monitor: 'prometheus-demo'
+
+# Alertmanager config
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["localhost:9093"]   # Update if Alertmanager runs elsewhere
+
+# Scrape your targets
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node'
+    ec2_sd_configs:
+      - region: us-east-1
+        port: 9100
+
+# Reference your alert rules file
+rule_files:
+  - "prometheus-alert-rules.yml"
